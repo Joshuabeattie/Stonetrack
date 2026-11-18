@@ -38,19 +38,19 @@ export const SAW_KERF_MM = 5
  * kept in one place so they are easy to explain and to tune.
  */
 export const STANDARD_TIMES = {
-  sawMinutesPerMetre: 3, // bridge saw, 20 mm stone, including handling
-  sawSetupMinutesPerPart: 4,
-  cncMinutesPerPolishedMetre: 5, // edge profiling and polishing on the CNC / edge line
-  cncMinutesPerCutout: 20, // sink, cooktop or tap-hole cutout
-  cncSetupMinutesPerPart: 6,
-  handFinishMinutesPerPart: 12, // hand polishing, sealing
+  sawMinutesPerMetre: 6, // bridge saw, 20 mm stone, including loading and handling
+  sawSetupMinutesPerPart: 10,
+  cncMinutesPerPolishedMetre: 8, // edge profiling and polishing on the CNC / edge line
+  cncMinutesPerCutout: 30, // sink, cooktop or tap-hole cutout
+  cncSetupMinutesPerPart: 10,
+  handFinishMinutesPerPart: 20, // hand polishing, sealing
   allocationHoursPerJob: 0.25,
   allocationHoursPerSlab: 0.1,
-  cutHandlingMinutesPerPart: 3,
-  qcHoursPerJob: 0.25,
-  qcMinutesPerPart: 4,
-  dispatchHoursPerJob: 0.5,
-  dispatchMinutesPerPart: 6,
+  cutHandlingMinutesPerPart: 5,
+  qcHoursPerJob: 0.5,
+  qcMinutesPerPart: 5,
+  dispatchHoursPerJob: 0.75,
+  dispatchMinutesPerPart: 10,
 } as const
 
 /**
@@ -275,7 +275,7 @@ export function standardHours(items: CutItem[], material: MaterialSpec, slabsReq
   const labour: Record<WorkStage, number> = {
     slab_allocation: round2(T.allocationHoursPerJob + slabsRequired * T.allocationHoursPerSlab),
     cutting: round2(saw + (parts * T.cutHandlingMinutesPerPart) / 60), // operator stays with the saw
-    finishing: round2(cnc * 0.5 + (parts * T.handFinishMinutesPerPart) / 60), // CNC runs part-unattended
+    finishing: round2(cnc + (parts * T.handFinishMinutesPerPart) / 60), // an operator attends the CNC, then hand-finishes
     quality_check: round2(T.qcHoursPerJob + (parts * T.qcMinutesPerPart) / 60),
     dispatch: round2(T.dispatchHoursPerJob + (parts * T.dispatchMinutesPerPart) / 60),
   }
