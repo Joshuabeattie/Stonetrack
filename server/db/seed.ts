@@ -312,6 +312,21 @@ export async function isDatabaseEmpty(db: pg.ClientBase | pg.Pool): Promise<bool
   return rows[0].n === 0
 }
 
+// Like the migration lock: a fixed number every server instance agrees on.
+const SEED_LOCK_ID = 74_210_002
+
+/**
+ * Loads the demo data only if the database has no users yet. Run it inside a transaction.
+ * The lock (released when the transaction ends) matters on Cloudflare, where several
+ * Worker instances can start at the same moment: the first one seeds, and the others
+ * wait, see the data is there, and do nothing.
+ */
+export async function seedIfEmpty(db: pg.ClientBase): Promise<SeedSummary | null> {
+  await db.query('SELECT pg_advisory_xact_lock($1)', [SEED_LOCK_ID])
+  if (!(await isDatabaseEmpty(db))) return null
+  return seedDemoData(db)
+}
+
 /**
  * Deletes ALL data and inserts the demo data set. Run it inside a transaction
  * (the CLI and the reset endpoint do) so a failure leaves the old data untouched.

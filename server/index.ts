@@ -4,16 +4,16 @@ import { createApp } from './app'
 import { config } from './config'
 import { pendingMigrations, runMigrations } from './db/migrate'
 import { closePool, getPool, withTransaction } from './db/pool'
-import { isDatabaseEmpty, seedDemoData } from './db/seed'
+import { isDatabaseEmpty, seedIfEmpty } from './db/seed'
 import { logger } from './logger'
 
 async function prepareDatabase() {
   const pool = getPool()
   if (config.runMigrationsOnStart) {
     await runMigrations(pool, (message) => logger.info(message))
-    if (config.demoMode && (await isDatabaseEmpty(pool))) {
-      const summary = await withTransaction((client) => seedDemoData(client))
-      logger.info('Empty database: loaded demo data', { ...summary })
+    if (config.demoMode) {
+      const summary = await withTransaction((client) => seedIfEmpty(client))
+      if (summary) logger.info('Empty database: loaded demo data', { ...summary })
     }
     return
   }
