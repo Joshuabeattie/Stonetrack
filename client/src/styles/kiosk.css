@@ -1,0 +1,343 @@
+/* Kiosk: a tablet on the factory floor. Everything is bigger and higher contrast,
+   and each tile carries a wide strip of the job's stone so it matches the slab on the rack. */
+
+.kiosk {
+  min-height: 100vh;
+  background: var(--paper);
+  font-size: 1.125rem;
+}
+
+.kiosk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: var(--rail);
+  color: var(--rail-ink);
+}
+.kiosk-bar :focus-visible {
+  outline-color: var(--signal);
+}
+
+.kiosk-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 1.625rem/1 var(--font-cond);
+}
+
+.kiosk-stations {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  overflow-x: auto;
+}
+.kiosk-stations button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rail-ink);
+  font: 600 1.125rem var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.kiosk-stations button.is-selected {
+  background: var(--rail-ink);
+  border-color: var(--rail-ink);
+  color: var(--ink);
+}
+.kiosk-count {
+  min-width: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+.kiosk-stations button.is-selected .kiosk-count {
+  background: rgba(30, 42, 50, 0.12);
+}
+
+.kiosk-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kiosk-clock {
+  font: 600 1.375rem var(--font-cond);
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px;
+}
+.kiosk-icon,
+.kiosk-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rail-ink);
+  font: 500 1rem var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kiosk-main {
+  padding: 18px 18px 40px;
+}
+.kiosk-empty {
+  padding: 64px 0;
+  text-align: center;
+  font-size: 1.375rem;
+  color: var(--ink-3);
+}
+
+.kiosk-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kiosk-tile {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  width: 100%;
+  min-height: 176px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.kiosk-tile:active {
+  transform: translateY(1px);
+}
+.kiosk-tile:hover {
+  border-color: var(--ink);
+}
+.kiosk-tile-stone {
+  width: 56px;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: inset -1px 0 0 rgba(30, 42, 50, 0.2);
+}
+.kiosk-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+.kiosk-tile-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kiosk-job {
+  font: 700 2.25rem/1 var(--font-cond);
+  letter-spacing: 0.01em;
+}
+.kiosk-client {
+  font-weight: 600;
+  font-size: 1.125rem;
+  line-height: 1.25;
+}
+.kiosk-stone {
+  color: var(--ink-2);
+  font-size: 1rem;
+}
+.kiosk-tile .stage-rail {
+  margin-top: 4px;
+}
+.kiosk-tile .stage-rail-seg {
+  width: 22px;
+  height: 10px;
+}
+.kiosk-tile .due-rel {
+  font-size: 0.9375rem;
+}
+
+/* The job panel */
+.kiosk-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow-y: auto;
+}
+.kiosk-panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  padding: 12px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.kiosk-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 60px;
+  padding: 0 18px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 1.125rem var(--font);
+  cursor: pointer;
+}
+.kiosk-panel-stone {
+  width: 88px;
+  height: 64px;
+  border-radius: 6px;
+}
+.kiosk-panel-title {
+  font: 700 2.5rem/1 var(--font-cond);
+}
+.kiosk-panel-title span {
+  font-weight: 600;
+  font-size: 1.75rem;
+  margin-left: 10px;
+}
+.kiosk-panel-sub {
+  margin-top: 4px;
+  color: var(--ink-2);
+}
+.kiosk-panel-body {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 22px 20px 48px;
+}
+.kiosk-panel-body .stage-rail-seg {
+  width: 40px;
+  height: 12px;
+}
+.kiosk-panel-body .stage-rail-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.kiosk-pieces {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kiosk-pieces li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--panel);
+  font-size: 1.125rem;
+}
+.kiosk-pieces li span:last-child {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+.kiosk-hint {
+  color: var(--ink-2);
+}
+
+.kiosk-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.kiosk-action {
+  justify-content: flex-start;
+  gap: 16px;
+  min-height: 116px;
+  padding: 20px 24px;
+  border-radius: 10px;
+  font-size: 1.75rem;
+  text-align: left;
+  white-space: normal;
+}
+.kiosk-action small {
+  display: block;
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* Bigger form controls inside the kiosk */
+.kiosk .choice {
+  min-height: 68px;
+  padding: 10px 14px;
+  font-size: 1.125rem;
+}
+.kiosk .choice-grid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.kiosk .stepper-button {
+  width: 68px;
+  min-height: 68px;
+}
+.kiosk .stepper-value {
+  min-width: 128px;
+  font-size: 1.5rem;
+}
+.kiosk .button-big {
+  min-height: 76px;
+  padding: 14px 28px;
+  font-size: 1.375rem;
+}
+.kiosk textarea {
+  font-size: 1.125rem;
+}
+
+@media (max-width: 760px) {
+  .kiosk-bar {
+    flex-wrap: wrap;
+  }
+  .kiosk-stations {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .kiosk-tools {
+    margin-left: auto;
+  }
+  .kiosk-panel-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .kiosk-panel-stone {
+    display: none;
+  }
+  .kiosk-panel-title {
+    font-size: 2rem;
+  }
+  .kiosk-panel-title span {
+    display: block;
+    margin: 4px 0 0;
+    font-size: 1.25rem;
+  }
+}

@@ -1,0 +1,203 @@
+/* The dispatch docket: an A4 page on screen, and a clean black-on-white print. */
+
+.docket-page {
+  min-height: 100vh;
+  padding: 20px 16px 48px;
+  background: #e9ece9;
+}
+.docket-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 210mm;
+  margin: 0 auto 16px;
+}
+.docket-toolbar .button-quiet {
+  background: var(--panel);
+}
+
+.docket {
+  max-width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 16mm 15mm;
+  background: #fff;
+  color: #111;
+  font-size: 10.5pt;
+  line-height: 1.4;
+  box-shadow: 0 2px 12px rgba(15, 25, 32, 0.12);
+}
+.docket h2 {
+  font: 600 9.5pt/1.2 var(--font);
+  color: #444;
+  margin-bottom: 3px;
+}
+
+.docket-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #111;
+}
+.docket-factory {
+  font: 700 16pt/1.1 var(--font-cond);
+}
+.docket-address {
+  color: #444;
+  font-size: 9pt;
+}
+.docket-title {
+  text-align: right;
+}
+.docket-title h1 {
+  font: 700 22pt/1 var(--font-cond);
+}
+
+.docket-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 18px;
+  padding: 12px 0;
+  border-bottom: 1px solid #bbb;
+}
+.docket-strong {
+  font-weight: 600;
+}
+.docket-qr {
+  width: 104px;
+  text-align: center;
+  font-size: 8pt;
+  color: #444;
+}
+.docket-qr img {
+  display: block;
+  margin: 0 auto 4px;
+}
+
+.docket-stone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+.docket-swatch {
+  width: 64px;
+  height: 28px;
+  border-radius: 2px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.docket-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 14px;
+}
+.docket-table th,
+.docket-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #ccc;
+  text-align: left;
+}
+.docket-table thead th {
+  font-weight: 600;
+  font-size: 9pt;
+  border-bottom: 1.5px solid #111;
+}
+.docket-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.docket-table tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+.docket-table tfoot .muted {
+  font-weight: 400;
+  text-align: right;
+  font-size: 9pt;
+}
+.check-col {
+  width: 64px;
+  text-align: center !important;
+}
+
+.box {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid #111;
+  vertical-align: -2px;
+}
+
+.docket-checks ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+  margin: 6px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.docket-checks li .box {
+  margin-right: 8px;
+}
+.docket-qc {
+  font-size: 9.5pt;
+  color: #333;
+}
+
+.docket-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-top: 34px;
+}
+.sign-line {
+  display: block;
+  height: 36px;
+  border-bottom: 1px solid #111;
+}
+.docket-signatures p {
+  margin-top: 4px;
+  font-size: 9pt;
+  color: #444;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+  }
+  .docket-page {
+    padding: 0;
+    background: #fff;
+  }
+  .docket-toolbar,
+  .toasts {
+    display: none !important;
+  }
+  .docket {
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .docket {
+    padding: 18px 14px;
+  }
+  .docket-parties {
+    grid-template-columns: 1fr;
+  }
+  .docket-checks ul,
+  .docket-signatures {
+    grid-template-columns: 1fr;
+  }
+}
