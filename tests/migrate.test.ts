@@ -1,9 +1,10 @@
 // The startup path that runs on every server instance: migrations and first-time
-// seeding, including several instances starting at the same moment.
+// seeding, including two instances starting at the same moment (which happens on
+// Cloudflare, where many Worker instances can boot at once).
 import pg from 'pg'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { readMigrationFiles, pendingMigrations, runMigrations } from '../server/db/migrate'
-import { closePool } from '../server/db/pool'
+import { closePool, getPool, runWithPool } from '../server/db/pool'
 import { seedIfEmpty } from '../server/db/seed'
 import { baseDatabaseUrl, testSsl } from './testDb'
 
@@ -100,5 +101,18 @@ describe('first-time seeding', () => {
     )
     expect(rows[0]).toEqual({ users: 3, jobs: 40 })
     expect(await seedInTransaction(freshPool())).toBeNull()
+  })
+})
+
+describe('request-scoped pools (Cloudflare Workers)', () => {
+  it('getPool() returns the request pool inside runWithPool, across awaits, and the shared pool outside', async () => {
+    const shared = getPool()
+    const requestPool = freshPool()
+    await runWithPool(requestPool, async () => {
+      expect(getPool()).toBe(requestPool)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(getPool()).toBe(requestPool)
+    })
+    expect(getPool()).toBe(shared)
   })
 })

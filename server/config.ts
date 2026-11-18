@@ -4,6 +4,9 @@
 // production (npm start / Replit publishing). Each profile has its own defaults,
 // and environment variables override them. Invalid values stop the server at
 // startup with a clear message, instead of failing later in a confusing way.
+//
+// DEPLOY_TARGET says where the server runs: "node" (Replit, npm start: the default)
+// or "cloudflare" (the staging Worker, set in wrangler.jsonc).
 import 'dotenv/config'
 import { z } from 'zod'
 
@@ -16,6 +19,7 @@ const booleanish = z
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).optional(),
   REPLIT_DEPLOYMENT: z.string().optional(), // Replit sets this to "1" in published apps
+  DEPLOY_TARGET: z.enum(['node', 'cloudflare']).optional(),
   DATABASE_URL: z.string().optional(),
   DATABASE_SSL: z.enum(['disable', 'require', 'verify']).optional(),
   PORT: z.coerce.number().int().positive().optional(),
@@ -77,19 +81,26 @@ const profiles: Record<AppEnv, Profile> = {
 }
 
 const profile = profiles[appEnv]
+const deployTarget = env.DEPLOY_TARGET ?? 'node'
 
 if (appEnv === 'production' && (!profile.webhookSecret || profile.webhookSecret.length < 16)) {
   throw new Error(
     'WEBHOOK_SECRET must be set (at least 16 characters) in production. ' +
-      'On Replit: Publishing → Adjust settings → production secrets.',
+      'On Replit: Publishing → Adjust settings → production secrets. On Cloudflare: wrangler.jsonc vars or a Worker secret.',
   )
 }
 
 export const config = {
   env: appEnv,
+  deployTarget,
   isProduction: appEnv === 'production',
   isTest: appEnv === 'test',
   ...profile,
+  // On Cloudflare, Cloudflare itself serves the React build before the Worker runs.
+  serveClient: profile.serveClient && deployTarget === 'node',
+  // Cloudflare puts the visitor's IP address in this header (and overwrites any copy a
+  // visitor sends). Elsewhere Express works the address out itself ("trust proxy").
+  clientIpHeader: deployTarget === 'cloudflare' ? 'cf-connecting-ip' : undefined,
   webhookSecret: profile.webhookSecret ?? '',
   databaseUrl: env.DATABASE_URL ?? '',
   // A public portfolio demo: show the demo logins, seed an empty database and allow "reset demo".

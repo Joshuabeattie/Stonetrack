@@ -1,4 +1,5 @@
 // The PostgreSQL connection pool and two helpers: `query` and `withTransaction`.
+import { AsyncLocalStorage } from 'node:async_hooks'
 import pg from 'pg'
 import { config } from '../config'
 import { logger } from '../logger'
@@ -48,8 +49,33 @@ function createPool(): pg.Pool {
 
 let pool: pg.Pool | undefined
 
-/** The shared pool, created on first use so importing this file never needs a database. */
+// On Cloudflare Workers a database connection can't be reused by a later request,
+// so cloudflare/worker.ts gives each request its own small pool and runs the whole
+// request inside runWithPool(). AsyncLocalStorage carries that pool through every
+// await, so services keep calling getPool() and never need to know which host they run on.
+const requestPool = new AsyncLocalStorage<pg.Pool>()
+
+/** Runs `work` with `scopedPool` as the pool that getPool() returns (Workers only). */
+export function runWithPool<T>(scopedPool: pg.Pool, work: () => T): T {
+  return requestPool.run(scopedPool, work)
+}
+
+/**
+ * A pool for one Workers request. Hyperdrive keeps the real connections to the database
+ * open between requests, so connecting here is fast. Max 5: a Worker request may have
+ * at most 6 connections open at once.
+ */
+export function createRequestPool(connectionString: string): pg.Pool {
+  return new pg.Pool({ connectionString, max: 5 })
+}
+
+/**
+ * The pool to use: the current request's pool on Workers, otherwise the shared pool,
+ * created on first use so importing this file never needs a database.
+ */
 export function getPool(): pg.Pool {
+  const scoped = requestPool.getStore()
+  if (scoped) return scoped
   pool ??= createPool()
   return pool
 }
