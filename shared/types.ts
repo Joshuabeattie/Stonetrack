@@ -136,6 +136,7 @@ export interface Slab {
   materialId: number
   materialCode: string
   materialName: string
+  materialType: MaterialType
   swatchHex: string
   lengthMm: number
   widthMm: number
@@ -168,7 +169,9 @@ export interface KioskJob {
   id: number
   jobNumber: string
   clientName: string
+  materialCode: string
   materialName: string
+  materialType: MaterialType
   swatchHex: string
   dueDate: IsoDate
   priority: Priority
@@ -236,7 +239,10 @@ export interface KpiReport {
 export interface PublicJobStatus {
   jobNumber: string
   clientName: string
+  materialCode: string
   materialName: string
+  materialType: MaterialType
+  swatchHex: string
   dueDate: IsoDate
   stage: Stage
   partCount: number

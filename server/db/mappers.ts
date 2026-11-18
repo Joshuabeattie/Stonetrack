@@ -204,7 +204,7 @@ export const toStageEvent = (r: StageEventRow): StageEvent => ({
 })
 
 export const SLAB_SQL = `
-  SELECT s.id, s.code, s.material_id, m.code AS material_code, m.name AS material_name, m.swatch_hex,
+  SELECT s.id, s.code, s.material_id, m.code AS material_code, m.name AS material_name, m.material_type, m.swatch_hex,
          s.length_mm, s.width_mm, s.status, s.rack_location, s.job_id, j.job_number,
          s.received_at, s.allocated_at, s.consumed_at
     FROM slabs s
@@ -217,6 +217,7 @@ export interface SlabRow {
   material_id: number
   material_code: string
   material_name: string
+  material_type: MaterialType
   swatch_hex: string
   length_mm: number
   width_mm: number
@@ -235,6 +236,7 @@ export const toSlab = (r: SlabRow): Slab => ({
   materialId: r.material_id,
   materialCode: r.material_code,
   materialName: r.material_name,
+  materialType: r.material_type,
   swatchHex: r.swatch_hex,
   lengthMm: r.length_mm,
   widthMm: r.width_mm,

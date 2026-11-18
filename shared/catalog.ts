@@ -52,6 +52,15 @@ export type SlabStatus = (typeof SLAB_STATUSES)[number]
 export const OPERATOR_TEAMS = ['yard', 'saw', 'cnc', 'finishing', 'qc', 'dispatch'] as const
 export type OperatorTeam = (typeof OPERATOR_TEAMS)[number]
 
+export const OPERATOR_TEAM_LABELS: Record<OperatorTeam, string> = {
+  yard: 'Yard',
+  saw: 'Saw',
+  cnc: 'CNC',
+  finishing: 'Finishing',
+  qc: 'Quality',
+  dispatch: 'Dispatch',
+}
+
 export const WORK_CENTRES = ['saw', 'cnc'] as const
 export type WorkCentre = (typeof WORK_CENTRES)[number]
 

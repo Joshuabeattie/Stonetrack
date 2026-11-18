@@ -287,14 +287,18 @@ export async function getPublicJobStatus(token: string): Promise<PublicJobStatus
     id: number
     job_number: string
     client_name: string
+    material_code: string
     material_name: string
+    material_type: Material['materialType']
+    swatch_hex: string
     due_date: string
     current_stage: Stage
     stage_updated_at: Date
     dispatched_at: Date | null
     part_count: number
   }>(
-    `SELECT j.id, j.job_number, c.name AS client_name, m.name AS material_name, j.due_date, j.current_stage,
+    `SELECT j.id, j.job_number, c.name AS client_name, m.code AS material_code, m.name AS material_name,
+            m.material_type, m.swatch_hex, j.due_date, j.current_stage,
             j.stage_updated_at, j.dispatched_at,
             (SELECT COALESCE(sum(quantity), 0)::int FROM job_pieces WHERE job_id = j.id) AS part_count
        FROM jobs j
@@ -316,7 +320,10 @@ export async function getPublicJobStatus(token: string): Promise<PublicJobStatus
   return {
     jobNumber: job.job_number,
     clientName: job.client_name,
+    materialCode: job.material_code,
     materialName: job.material_name,
+    materialType: job.material_type,
+    swatchHex: job.swatch_hex,
     dueDate: job.due_date,
     stage: job.current_stage,
     partCount: job.part_count,

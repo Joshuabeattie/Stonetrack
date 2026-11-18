@@ -47,7 +47,7 @@ async function lockJob(tx: pg.PoolClient, jobId: number): Promise<LockedJob> {
 function assertExpectedStage(job: LockedJob, expected: Stage) {
   if (job.current_stage !== expected) {
     throw conflict(
-      `${job.job_number} is now in ${STAGE_LABELS[job.current_stage]}, not ${STAGE_LABELS[expected]}. Someone else has updated it — refresh and try again.`,
+      `${job.job_number} is now in ${STAGE_LABELS[job.current_stage]}, not ${STAGE_LABELS[expected]}. Someone else has updated it. Refresh and try again.`,
       'STAGE_CHANGED',
     )
   }
@@ -163,7 +163,9 @@ export async function listKioskJobs(): Promise<KioskJob[]> {
       id: summary.id,
       jobNumber: summary.jobNumber,
       clientName: summary.clientName,
+      materialCode: summary.materialCode,
       materialName: summary.materialName,
+      materialType: summary.materialType,
       swatchHex: summary.swatchHex,
       dueDate: summary.dueDate,
       priority: summary.priority,

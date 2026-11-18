@@ -39,20 +39,21 @@ export function canFlagRemake(stage: Stage): boolean {
   return stage === 'cutting' || stage === 'finishing' || stage === 'quality_check' || stage === 'dispatch'
 }
 
-/** Short verb for the button that completes the current stage. */
-export function advanceLabel(stage: Stage): string {
-  switch (stage) {
-    case 'slab_allocation':
-      return 'Slabs ready → start cutting'
-    case 'cutting':
-      return 'Cutting done → finishing'
-    case 'finishing':
-      return 'Finishing done → quality check'
-    case 'quality_check':
-      return 'QC passed → dispatch'
-    case 'dispatch':
-      return 'Loaded → mark dispatched'
-    case 'dispatched':
-      return 'Dispatched'
-  }
+/** What the button that completes each stage says (the kiosk shows the next stage underneath). */
+export const ADVANCE_ACTIONS: Record<WorkStage, string> = {
+  slab_allocation: 'Slabs ready',
+  cutting: 'Cutting done',
+  finishing: 'Finishing done',
+  quality_check: 'QC passed',
+  dispatch: 'Mark dispatched',
+}
+
+/** Plain-language description of each stage, for the client tracking page. */
+export const STAGE_DESCRIPTIONS: Record<Stage, string> = {
+  slab_allocation: 'Your stone slabs are being picked from the yard.',
+  cutting: 'Your pieces are being cut to size on the saw.',
+  finishing: 'Edges are being profiled and polished, and cutouts made.',
+  quality_check: 'Every piece is checked against your drawing.',
+  dispatch: 'Your benchtops are wrapped and waiting for the truck.',
+  dispatched: 'Your benchtops have left the factory.',
 }
