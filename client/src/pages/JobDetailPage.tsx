@@ -225,7 +225,7 @@ export function JobDetailPage() {
               Slabs
             </h2>
             <p className="muted">
-              {slabsHeld} of {plural(slabsNeeded, 'slab')} allocated.
+              {plural(slabsHeld, 'slab')} allocated. The cutting list needs {slabsNeeded}.
               {j.stage === 'slab_allocation' && slabsHeld < slabsNeeded && ' Completing slab allocation picks the rest automatically, oldest stock first.'}
             </p>
             {j.slabs.length > 0 && (
