@@ -1,0 +1,20 @@
+# Replit configuration for StoneTrack.
+# Run button (development): installs packages if needed, then starts the API (3001) and Vite (5000).
+modules = ["nodejs-20", "web", "postgresql-16"]
+run = "npm install --no-audit --no-fund && npm run dev"
+hidden = [".config", ".git", "node_modules", "dist"]
+
+[nix]
+channel = "stable-24_05"
+
+# Publishing (production): build once, then run the compiled server.
+# The server applies pending migrations on start and serves the built React app.
+[deployment]
+deploymentTarget = "autoscale"
+build = ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"]
+run = ["npm", "run", "start"]
+
+# Vite (dev) and Express (production) both listen on 5000, which Replit exposes on port 80.
+[[ports]]
+localPort = 5000
+externalPort = 80
