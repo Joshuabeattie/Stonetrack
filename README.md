@@ -4,6 +4,8 @@ An operations platform for a (fictional) stone benchtop fabrication factory: job
 
 Built as a portfolio demo with React + Vite, Node.js + Express and PostgreSQL, all in TypeScript, set up to run and publish on Replit. A staging copy also runs on Cloudflare Workers (see [Staging site on Cloudflare](#staging-site-on-cloudflare)).
 
+**Live demo:** https://stonetrack.ffdailyreview.workers.dev (sign in with the demo accounts below; the data resets every night).
+
 > Every business, person, address, phone number and order in this project is invented. Phone numbers use the 03 5550 range reserved for fiction; emails use `.example` domains.
 
 | Dashboard | Kiosk (tablet) |
