@@ -23,7 +23,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "00000000000000000000000000000000",
+      "id": "2ade2f79b4724730b12ac35ffee055e9",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/stonetrack"
     }
   ],
