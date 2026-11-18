@@ -7,7 +7,9 @@ import helmet from 'helmet'
 import { config } from './config'
 import { HttpError } from './http/errors'
 import { errorHandler, requestContext } from './http/middleware'
+import { webhookLimiter } from './http/rateLimits'
 import { apiRouter } from './routes'
+import { receiveOrderWebhook } from './routes/webhooks'
 
 export function createApp() {
   const app = express()
@@ -28,6 +30,10 @@ export function createApp() {
       },
     }),
   )
+
+  // The order webhook needs the raw request body to check its signature,
+  // so it is registered before the JSON parser below.
+  app.post('/api/webhooks/orders', webhookLimiter, express.raw({ type: () => true, limit: '256kb' }), receiveOrderWebhook)
 
   app.use(express.json({ limit: '200kb' }))
   app.use('/api', apiRouter())
