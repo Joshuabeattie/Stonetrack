@@ -1,0 +1,34 @@
+{
+  "externalRef": "QP-30001",
+  "client": {
+    "name": "Larkspur Lane Kitchens",
+    "email": "design@larkspurlane.example",
+    "phone": "03 5550 0110"
+  },
+  "siteAddress": "27 Bellbird Way, Fernleigh VIC",
+  "drawingRef": "QP-DWG-0931 Rev A",
+  "materialCode": "POR-ASH",
+  "dueDate": "2027-03-15",
+  "priority": "normal",
+  "notes": "Sent from the quoting portal.",
+  "pieces": [
+    {
+      "name": "Main bench",
+      "lengthMm": 2650,
+      "widthMm": 650,
+      "quantity": 1,
+      "edgeProfile": "pencil_round",
+      "polishedEdges": ["front"],
+      "cutouts": 2
+    },
+    {
+      "name": "Splashback",
+      "lengthMm": 2100,
+      "widthMm": 650,
+      "quantity": 1,
+      "edgeProfile": "arris",
+      "polishedEdges": [],
+      "cutouts": 0
+    }
+  ]
+}
