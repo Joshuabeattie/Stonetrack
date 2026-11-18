@@ -2,7 +2,7 @@
 
 An operations platform for a (fictional) stone benchtop fabrication factory: job intake with a generated cutting list, shop-floor tracking from a tablet kiosk, slab stock, capacity planning, KPIs, dispatch dockets, a client tracking link and an order webhook.
 
-Built as a portfolio demo with React + Vite, Node.js + Express and PostgreSQL, all in TypeScript, set up to run and publish on Replit.
+Built as a portfolio demo with React + Vite, Node.js + Express and PostgreSQL, all in TypeScript, set up to run and publish on Replit. A staging copy also runs on Cloudflare Workers (see [Staging site on Cloudflare](#staging-site-on-cloudflare)).
 
 > Every business, person, address, phone number and order in this project is invented. Phone numbers use the 03 5550 range reserved for fiction; emails use `.example` domains.
 
@@ -115,6 +115,47 @@ DATABASE_SSL=disable WEBHOOK_SECRET=any-long-local-secret-value PORT=5050 npm st
 
 (`DATABASE_SSL=disable` because a local PostgreSQL usually has no SSL, while production defaults to SSL.)
 
+## Staging site on Cloudflare
+
+Besides Replit, the same app runs as a Cloudflare Worker. That gives a public staging link that redeploys itself on every push to `main`.
+
+```
+Browser ──► Cloudflare
+              ├─ the React build (dist/client), served directly
+              └─ /api/* ──► Worker (cloudflare/worker.ts) running the same Express app
+                              └─► Hyperdrive (connection pool) ──► PostgreSQL on Neon
+```
+
+What's different from Replit, in short ([WALKTHROUGH.md](WALKTHROUGH.md), section 11, has the detail):
+
+- Cloudflare serves the React files itself; only `/api/*` runs the Worker.
+- Each request gets its own small database pool, and Hyperdrive keeps the real connections to Neon open.
+- There's no start-up step: the first request each Worker instance handles applies migrations and seeds an empty database.
+- A nightly cron job (16:00 UTC, 3am Melbourne summer time) restores the demo data, so the dates stay current.
+
+### One-time setup
+
+You need a Cloudflare account on the **Workers Paid** plan ($5 USD a month) and a free Neon account. The free Workers plan allows 10 ms of CPU per request; checking a password takes about 40 ms and building the demo data about 250 ms.
+
+1. **Database.** On neon.com, create a project called `stonetrack` in the Sydney region. Select **Connect**, turn **Connection pooling** off (Hyperdrive does the pooling) and copy the connection string.
+2. **Hyperdrive.** In the Cloudflare dashboard, open **Hyperdrive** and create a configuration called `stonetrack-db` with that connection string. Then turn its **caching off**. Otherwise Hyperdrive answers repeated reads from a cache for up to a minute, and a job moved on the kiosk could still show its old stage. Put the configuration's ID in `wrangler.jsonc` (`hyperdrive[0].id`) and push.
+3. **Deploy from GitHub.** In **Workers & Pages**, select **Create application**, then **Import a repository**, and choose this repository. Keep the name `stonetrack` (it must match `name` in `wrangler.jsonc`). Set **Build command** to `npm run build:cf` and leave the deploy command as `npx wrangler deploy`. Select **Deploy**.
+4. Open `https://stonetrack.<your-subdomain>.workers.dev/api/health`. It should answer `{"ok":true,"database":"up","environment":"production"}`. The very first request takes a few seconds while it creates the tables and loads the demo data.
+
+After that, every push to `main` builds and deploys automatically. The Worker's logs are in the Cloudflare dashboard, or run `npx wrangler tail`.
+
+**The webhook secret on staging** is in `wrangler.jsonc` on purpose. Staging is a public demo whose admin password is in this README, so the secret protects nothing extra, and having it public lets anyone send the example order to staging:
+
+```bash
+STONETRACK_URL=https://stonetrack.<your-subdomain>.workers.dev WEBHOOK_SECRET=stonetrack-staging-public-demo-secret npm run webhook:example
+```
+
+For a real deployment, delete it from `wrangler.jsonc` and store it as a secret with `npx wrangler secret put WEBHOOK_SECRET`.
+
+### Run the Worker on your computer
+
+`npm run cf:dev` builds the React app and runs the Worker in Cloudflare's runtime at http://localhost:8787. It uses the database in `localConnectionString` in `wrangler.jsonc`; change that to match your PostgreSQL, or set `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. To run the nightly reset by hand: `curl http://localhost:8787/cdn-cgi/local/scheduled`.
+
 ## Scripts
 
 | Script | What it does |
@@ -126,8 +167,11 @@ DATABASE_SSL=disable WEBHOOK_SECRET=any-long-local-secret-value PORT=5050 npm st
 | `npm run db:seed` | Replaces all data with the demo data (refuses in production without `--force`) |
 | `npm run db:setup` | Both of the above |
 | `npm test` | API and unit tests (Vitest + Supertest) against a real database |
-| `npm run typecheck` | TypeScript checks for the server and the browser code |
+| `npm run typecheck` | TypeScript checks for the server, the browser code and the Cloudflare Worker |
 | `npm run webhook:example` | Sends a signed example order to the webhook |
+| `npm run build:cf` | Builds the React app for Cloudflare (adds the security headers file) |
+| `npm run cf:dev` | Runs the Cloudflare Worker locally at http://localhost:8787 |
+| `npm run cf:deploy` | Builds and deploys to Cloudflare from your computer (run `npx wrangler login` first) |
 
 ## Configuration
 
@@ -143,6 +187,7 @@ Settings come from environment variables (on Replit: **Secrets**; locally: `.env
 | `DATABASE_SSL` | `disable` | `require` | `disable`, `require` (encrypted, certificate not checked, as Replit documents) or `verify` |
 | `FACTORY_TIMEZONE` | `Australia/Melbourne` | `Australia/Melbourne` | Used for "today", due dates and KPI weeks |
 | `LOG_LEVEL` | `debug` | `info` | Development logs are readable lines; production logs are JSON |
+| `DEPLOY_TARGET` | `node` | `node` | `cloudflare` on the staging Worker (set in `wrangler.jsonc`): Cloudflare serves the React build, and rate limits read Cloudflare's visitor-address header |
 
 ## The order webhook
 
@@ -208,6 +253,7 @@ shared/      Code both sides use: stages, validation rules, the cutting list, ty
 tests/       API and unit tests
 docs/        Example webhook order and screenshots
 scripts/     The webhook example sender
+cloudflare/  The staging Worker: entry point, bundled migrations, static-file headers
 ```
 
 [WALKTHROUGH.md](WALKTHROUGH.md) explains the architecture, the data model and every main file.
@@ -223,6 +269,10 @@ scripts/     The webhook example sender
 | Published app won't start: `WEBHOOK_SECRET must be set` | Add the secret under Publishing, Adjust settings |
 | Tests say "Refusing to run tests" | The database ignored the `search_path` option (some connection poolers do). Point `TEST_DATABASE_URL` at a database just for tests |
 | Kiosk says "Not enough stock" | Receive slabs for that stone on the Slabs page, then try again |
+| Staging API answers `DATABASE_UNAVAILABLE` | Hyperdrive can't reach Neon. Check the Hyperdrive configuration's connection string (pooling off), then the Worker's logs |
+| Staging shows "Worker exceeded resource limits" (error 1102) | The account is on the free Workers plan (10 ms of CPU per request). Switch to Workers Paid |
+| Workers Builds fails: "The name in your Wrangler configuration file … must match" | Name the Worker `stonetrack`, or change `name` in `wrangler.jsonc` |
+| Staging shows an old value right after a change | Hyperdrive caching is on. Turn it off in the Hyperdrive configuration |
 
 ## Pushing this repository to GitHub from a zip
 

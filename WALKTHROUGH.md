@@ -1,6 +1,6 @@
 # StoneTrack walkthrough
 
-This document explains how StoneTrack works, in plain language, so you can explain any part of it and debug it yourself. It covers the architecture, the data model, the main algorithms, security, configuration, the front end, the tests, every main file, and how to debug common problems. It ends with likely interview questions.
+This document explains how StoneTrack works, in plain language, so you can explain any part of it and debug it yourself. It covers the architecture, the data model, the main algorithms, security, configuration, the front end, the tests, every main file, the staging site on Cloudflare, and how to debug common problems. It ends with likely interview questions.
 
 ## 1. The big picture
 
@@ -180,7 +180,7 @@ All calculated from the data, for jobs dispatched in the chosen period (7, 30 or
 
 **Client portal.** The share token is 18 random bytes (24 characters), so the link itself is the key. The page returns progress only: no notes, address, people, prices or ids. Managers can replace the link, which disables the old one immediately.
 
-**Other protections.** Security headers via helmet (CSP, `nosniff`, and others). Rate limits on login (10 a minute per IP), the webhook and the public page. `trust proxy` is set so rate limits see the real client IP behind Replit's proxy. JSON bodies are capped in size.
+**Other protections.** Security headers via helmet (CSP, `nosniff`, and others). Rate limits on login (10 a minute per IP), the webhook and the public page. `trust proxy` is set so rate limits see the real client IP behind Replit's proxy (on the Cloudflare staging site the address comes from Cloudflare's `CF-Connecting-IP` header instead; see section 11). JSON bodies are capped in size.
 
 ## 6. Configuration and environments
 
@@ -199,9 +199,11 @@ All calculated from the data, for jobs dispatched in the chosen period (7, 30 or
 
 `NODE_ENV` chooses the profile. If it's missing but Replit's `REPLIT_DEPLOYMENT=1` is present, production is assumed. Bad values stop the server at startup with a clear message.
 
+The Cloudflare staging site (section 11) uses the production profile with `DEPLOY_TARGET=cloudflare`, set in `wrangler.jsonc`. That changes two things: Express doesn't serve the React build (Cloudflare does), and rate limits read the visitor's address from Cloudflare's header.
+
 ## 7. Migrations and seed data
 
-**Migrations** (`server/db/migrate.ts`). Plain SQL files in `server/db/migrations`, run in filename order. The `schema_migrations` table records which have run. Each file runs in a transaction. A PostgreSQL advisory lock means two server instances starting together can't both migrate. To change the schema, add `002_something.sql`. Never edit a file that has already run somewhere.
+**Migrations** (`server/db/migrate.ts`). Plain SQL files in `server/db/migrations`, run in filename order. The `schema_migrations` table records which have run. Each file runs in its own transaction, which first takes a PostgreSQL advisory lock, so two server instances starting together can't both run it: the second waits, then sees the file is already recorded and skips it. The lock is transaction-level (`pg_advisory_xact_lock`), so COMMIT or ROLLBACK releases it; section 11 explains why that matters behind a connection pooler. When nothing is pending, which is every start after the first, the runner makes one query and takes no lock. To change the schema, add `002_something.sql`. Never edit a file that has already run somewhere.
 
 The SQL uses `IF NOT EXISTS` everywhere, which matters on Replit. When you publish, Replit copies the table structure (but not the `schema_migrations` rows) from the development database to the production database. When the production server then starts, the runner sees the file as "not yet applied" and runs it again, which is harmless because every statement skips what already exists. I tested both orders: an empty database, and one that already had the structure.
 
@@ -212,7 +214,7 @@ The SQL uses `IF NOT EXISTS` everywhere, which matters on Replit. When you publi
 - one stone with no stock and a job waiting for it, to show the "Not enough stock" path;
 - consistent history (only working days and working hours, labour around the standard times), slabs that match each job's cutting list, and a few webhook deliveries.
 
-The same seed function powers `npm run db:seed`, "Reset demo data" (admin) and the empty-database seed in production.
+The same seed function powers `npm run db:seed`, "Reset demo data" (admin), the empty-database seed in production and the nightly reset on staging. The empty-database seed goes through `seedIfEmpty()`, which takes its own transaction-level lock and checks again, so two instances starting at once can't both seed.
 
 ## 8. The front end
 
@@ -228,7 +230,7 @@ The same seed function powers `npm run db:seed`, "Reset demo data" (admin) and t
 
 ## 9. Tests
 
-`npm test` runs 98 tests with Vitest and Supertest:
+`npm test` runs 106 tests with Vitest and Supertest:
 
 | File | Covers |
 | --- | --- |
@@ -240,11 +242,13 @@ The same seed function powers `npm run db:seed`, "Reset demo data" (admin) and t
 | `tests/public.test.ts` | Client portal content, nothing internal leaks, replacing the link |
 | `tests/webhooks.test.ts` | Signatures, tampering, replay, idempotency, validation, the delivery log |
 | `tests/admin.test.ts` | User management, machine hours, demo reset |
+| `tests/migrate.test.ts` | Migrating a brand-new database, a second start doing nothing, three instances migrating at once, a failing migration rolled back, two instances seeding at once, request-scoped pools |
+| `tests/cloudflare.test.ts` | Every migration is bundled into the Worker; the static files' security headers match helmet's |
 | `tests/capacityPlanner.test.ts`, `tests/cuttingList.test.ts`, `tests/dates.test.ts` | The pure functions |
 
 **How the tests get a database.** They use the real PostgreSQL in `DATABASE_URL` (or `TEST_DATABASE_URL`), but in a separate schema, `stonetrack_test`. `tests/testDb.ts` adds `options=-c search_path=stonetrack_test` to the connection URL, so `SELECT * FROM jobs` reads `stonetrack_test.jobs`, never your demo data in `public.jobs`. `tests/globalSetup.ts` recreates the schema, checks the connection really landed in it (and refuses to continue if not), and runs the migrations. Each test starts from a small known data set (`resetDatabase()` in `tests/helpers.ts`), and its table names are schema-qualified as a second safety net.
 
-**Checking the tests can fail.** A test that never fails proves nothing, so I broke three protections on purpose and confirmed the right tests went red: removing the row lock (the simultaneous-taps test failed), accepting any webhook signature (three signature tests failed), and adding notes to the client page (the "never exposes internal details" test failed). Then I restored the code.
+**Checking the tests can fail.** A test that never fails proves nothing, so I broke three protections on purpose and confirmed the right tests went red: removing the row lock (the simultaneous-taps test failed), accepting any webhook signature (three signature tests failed), and adding notes to the client page (the "never exposes internal details" test failed). Then I restored the code. For the Cloudflare work I broke five more things the same way: leaving a migration out of the Worker bundle, changing one copied security header, removing the seed lock, removing the migration lock, and making `getPool()` ignore the request's pool. Each one turned a test red.
 
 Run one file or one test: `npx vitest run tests/stages.test.ts -t "simultaneous"`.
 
@@ -260,6 +264,16 @@ Run one file or one test: `npx vitest run tests/stages.test.ts -t "simultaneous"
 | `vitest.config.ts` | Test setup: global setup, environment file, one test file at a time |
 | `tsconfig.json`, `client/tsconfig.json` | TypeScript settings for the server side and the browser side |
 | `.env.example` | Every environment variable, with defaults |
+| `wrangler.jsonc` | The Cloudflare staging site: Worker entry point, static files and page routing, the Hyperdrive binding, variables, the nightly cron |
+
+### `cloudflare/` (staging only)
+
+| File | Purpose |
+| --- | --- |
+| `worker.ts` | The Worker: a pool per request, database preparation on an instance's first request, Express via `handleAsNodeRequest`, the nightly reset |
+| `migrations.ts` | The migration files, bundled into the Worker as text |
+| `_headers` | Security and cache headers for the static files Cloudflare serves (a copy of helmet's) |
+| `sql.d.ts`, `tsconfig.json` | Types for `.sql` imports and for the Workers runtime |
 
 ### `shared/`
 
@@ -295,11 +309,11 @@ Run one file or one test: `npx vitest run tests/stages.test.ts -t "simultaneous"
 | `http/errors.ts` | `HttpError` and helpers like `notFound()` and `conflict()` |
 | `http/middleware.ts` | Request ids and logging, the final error handler |
 | `http/validate.ts` | `parse(schema, data)`: validate or throw 422 |
-| `http/rateLimits.ts` | Login, webhook and public page limits |
-| `db/pool.ts` | Connection pool, `query()`, `withTransaction()`, SSL choice, type parsing |
-| `db/migrate.ts` | The migration runner |
+| `http/rateLimits.ts` | Login, webhook and public page limits, counted per visitor address |
+| `db/pool.ts` | Connection pool, `query()`, `withTransaction()`, SSL choice, type parsing, and request-scoped pools for Cloudflare (`runWithPool`) |
+| `db/migrate.ts` | The migration runner (files read from disk, or passed in as text by the Worker) |
 | `db/migrations/001_initial_schema.sql` | The schema |
-| `db/seed.ts` | Demo data |
+| `db/seed.ts` | Demo data, and `seedIfEmpty()` for first starts |
 | `db/mappers.ts` | Shared SQL snippets and row-to-JSON conversion |
 | `db/insert.ts` | Multi-row inserts for the seed and pieces |
 | `cli/migrate.ts`, `cli/seed.ts` | The `npm run db:*` commands |
@@ -330,9 +344,54 @@ Run one file or one test: `npx vitest run tests/stages.test.ts -t "simultaneous"
 | `pages/IntegrationsPage.tsx`, `pages/UsersPage.tsx` | Admin screens |
 | `styles/*.css` | Design tokens and styles for the app, kiosk, docket and client page |
 
-## 11. Debugging guide
+## 11. The staging site on Cloudflare
 
-**Start with the request id.** Every response has an `X-Request-Id` header, every error body has `requestId`, and every log line has it too. Copy it from the error (or the browser's Network tab) and search the logs: the Shell in development, or **Publishing → Logs** in production, where each line is JSON.
+The brief asked for Replit, and that set-up is unchanged. The staging site is a second way to run the same code, on Cloudflare Workers, so there's a public link that redeploys itself from GitHub.
+
+```
+Browser
+  │  https://stonetrack.<subdomain>.workers.dev
+  ▼
+Cloudflare ── the React build (dist/client): served directly, with the headers in cloudflare/_headers
+  │
+  └─ /api/* ──► Worker: cloudflare/worker.ts ──► the same Express app (server/app.ts)
+                                                    │  node-postgres, one small pool per request
+                                                    ▼
+                                                Hyperdrive (Cloudflare's connection pool, near the database)
+                                                    │
+                                                    ▼
+                                                PostgreSQL on Neon (Sydney)
+```
+
+**What a Worker is.** Not a server that runs all the time. Cloudflare starts an instance of the code when a request arrives, may keep it for later requests, and may run many instances at once in different places. It runs in Cloudflare's own JavaScript runtime (workerd), not Node.js, but with Node.js compatibility on (`nodejs_compat` in `wrangler.jsonc`) the Node APIs that Express and pg need are there.
+
+**How Express runs inside it.** `cloudflare/worker.ts` creates the Express app once per instance and calls `listen(8080)`. Nothing opens a real port: the number is just a name. For each request, `handleAsNodeRequest(8080, request)` (from `cloudflare:node`) turns the Workers `Request` into a Node request for Express, and Express's reply back into a `Response`. The routes, middleware, validation and services are exactly the ones Replit runs.
+
+**Static files.** `wrangler.jsonc` points Cloudflare at `dist/client`. Cloudflare serves those files itself, and only `/api/*` runs the Worker (`run_worker_first`). Other unknown paths, like `/jobs/12`, get `index.html` (`not_found_handling: single-page-application`), so React Router handles them, as Express's fallback does on Replit. Helmet never sees these responses, so `cloudflare/_headers` repeats its security headers and adds a one-year cache for the hashed files in `/assets`. `tests/cloudflare.test.ts` fails if the copy drifts from what helmet sends.
+
+**Database connections: a pool per request.** A Worker can't open a database connection in one request and use it in the next (Cloudflare refuses with "Cannot perform I/O on behalf of a different request"). So for each request the Worker creates a small pool (`createRequestPool`, at most 5 connections, because a request may have 6 open), runs the whole request inside `runWithPool(pool, …)`, and closes the pool once the response is on its way (`ctx.waitUntil(pool.end())`). That's cheap because the connections go to Hyperdrive, which keeps the real connections to Neon open next to the database.
+
+The services never know any of this happens. They call `getPool()` as always, and `getPool()` in `server/db/pool.ts` checks an `AsyncLocalStorage` first. That's a Node.js feature that carries a value through every `await` that follows from a call. Inside `runWithPool` it returns the request's pool. On Replit and in the tests nothing sets one, so it returns the shared pool.
+
+**No start-up step.** A Worker has no "server starting" moment, so the first request each instance handles runs `prepareDatabase()`. It applies new migrations (bundled into the Worker as text by `cloudflare/migrations.ts`, because a Worker can't read the project folder) and, if the database has no users, loads the demo data. Then the instance remembers it's done. When everything is already in place, that costs two quick queries. Many instances can start at once, so both steps take locks. I sent 15 simultaneous first requests to an empty database: the tables were created once, the demo data was loaded once, and all 15 requests succeeded.
+
+**Why the locks are transaction-level.** Hyperdrive pools connections in transaction mode: a connection to the real database is yours until your transaction ends, and then it may go to someone else. A session-level advisory lock (`pg_advisory_lock`) would stay on that connection after we finished and block everyone else. So the migration runner and the seed take `pg_advisory_xact_lock` inside a transaction, and PostgreSQL releases it at COMMIT or ROLLBACK. The runner's first version used a session-level lock. It worked against a local database; reading Hyperdrive's documentation showed it would have broken on staging.
+
+**Nightly reset.** The demo data counts back from today, so after a few days its dates would look stale, and visitors move jobs around. A cron trigger in `wrangler.jsonc` runs the Worker's `scheduled()` handler at 16:00 UTC (3am Melbourne summer time), which reloads the demo data in one transaction.
+
+**Rate limits.** The counts live in each instance's memory, so on Cloudflare a limit applies per instance rather than across the whole site: looser, but still enough to stop a script hammering the login. The visitor's address comes from Cloudflare's `CF-Connecting-IP` header (`config.clientIpHeader`), which Cloudflare sets and overwrites if a visitor sends their own. Each limiter is created on its first request rather than when the file loads, because the limiter's memory store starts a timer and Workers don't allow timers outside a request.
+
+**CPU limits.** Workers count CPU time, not time spent waiting for the database. The free plan allows 10 ms of CPU per request. Checking a password with scrypt takes about 40 ms and building the demo data about 250 ms, so staging needs the Workers Paid plan (30 seconds per request by default). Ordinary API requests use a few milliseconds.
+
+**Configuration.** `wrangler.jsonc` sets the variables: `NODE_ENV=production`, `DEPLOY_TARGET=cloudflare`, `DEMO_MODE=true`, and a deliberately public `WEBHOOK_SECRET` (the README explains why). The Hyperdrive binding hands the Worker its connection string, so there's no `DATABASE_URL`.
+
+**Deploying.** Workers Builds watches the GitHub repository. On each push to `main` it installs the dependencies, runs `npm run build:cf` (the React build plus `_headers`) and `npx wrangler deploy`. Wrangler bundles `cloudflare/worker.ts` and everything it imports with esbuild and uploads it with the static files.
+
+**Debugging staging.** The Worker's logs (the same JSON lines as Replit's) are in the Cloudflare dashboard under the Worker, or stream them with `npx wrangler tail`. `/api/health` checks the database. To reproduce a problem in the real runtime, `npm run cf:dev` runs the Worker in workerd on your computer against your local PostgreSQL.
+
+## 12. Debugging guide
+
+**Start with the request id.** Every response has an `X-Request-Id` header, every error body has `requestId`, and every log line has it too. Copy it from the error (or the browser's Network tab) and search the logs: the Shell in development, **Publishing → Logs** in production, or the Worker's logs on Cloudflare (or `npx wrangler tail`). In production and on staging each line is JSON.
 
 **Look at the data.** The `postgresql-16` module puts `psql` in the Replit Shell:
 
@@ -368,10 +427,13 @@ SELECT j.job_number FROM jobs j
 | Vite "Blocked request. This host is not allowed" | Add your domain to `allowedHosts` in `vite.config.ts` |
 | A page shows an old value | Each page reloads its data after a change; the kiosk also refreshes every 30 seconds |
 | The KPIs look wrong | Recalculate by hand with the formulas in section 4; `tests/planning.test.ts` shows a worked example |
+| Staging API answers `503 DATABASE_UNAVAILABLE` | The Worker can't reach Neon through Hyperdrive. Check the Hyperdrive configuration's connection string (pooling off) and the Worker's logs. On Neon's free plan the database sleeps when idle and wakes on the next query; it stays asleep only if the month's free compute is used up |
+| Staging shows "Worker exceeded resource limits" (error 1102) | The account is on the free Workers plan, which allows 10 ms of CPU per request; signing in needs about 40 ms. Switch to Workers Paid |
+| Staging shows an old value right after a change | Hyperdrive's query cache is on. Turn caching off in the Hyperdrive configuration |
 
 **Debugging a test.** Run it alone (`npx vitest run tests/stages.test.ts -t "remake"`), add `LOG_LEVEL=debug` to see server logs, and remember each test starts from the small data set in `tests/helpers.ts`, not the demo data.
 
-## 12. Interview questions you might get
+## 13. Interview questions you might get
 
 **Why raw SQL instead of an ORM?** The queries are visible and easy to explain, and features like `FOR UPDATE`, `SKIP LOCKED`, `FILTER`, `LATERAL` joins and generated columns are first-class. Every query uses `$1` placeholders, never string building, so there's no SQL injection. With a bigger team I'd consider a query builder or ORM for type-safe queries and generated migrations.
 
@@ -380,6 +442,12 @@ SELECT j.job_number FROM jobs j
 **What happens if the webhook sender retries?** It gets the same job back with `200`, because `external_ref` is unique. Even two identical deliveries arriving at the same moment produce one job: the second hits the unique constraint and is treated as a duplicate.
 
 **How would it scale?** Sessions and data are already in PostgreSQL, so several server instances can run side by side (Autoscale does this), and migrations are guarded by an advisory lock. Next steps would be a shared store for rate limits (they're in memory per instance now), caching or snapshotting cutting lists, moving KPI queries to a read replica or pre-aggregated tables, and background jobs for slow work.
+
+**Why is staging on Cloudflare when the brief says Replit?** The Replit set-up is unchanged and documented. Staging is an extra: a link that's always up and redeploys on every push, on the hosting I use for my other projects. It also shows the code isn't tied to one host: the Cloudflare-specific code is one entry file, one config file and a headers file.
+
+**What had to change for Express to run on Workers?** Five things, each small: database connections can't outlive a request (a pool per request, found through `AsyncLocalStorage`), there's no start-up hook (prepare the database on an instance's first request, with locks), there's no project folder at runtime (migrations bundled as text), timers aren't allowed outside a request (rate limiters created on first use), and Cloudflare serves the static files (so the security headers are copied into `_headers`).
+
+**Why transaction-level advisory locks?** Hyperdrive pools connections in transaction mode, so after a transaction ends the same database connection can go to someone else. A session-level lock would stay with that connection and block everyone. `pg_advisory_xact_lock` is released by COMMIT or ROLLBACK, so it can't leak. My first version used a session-level lock; it passed locally, and reading Hyperdrive's documentation caught it before it reached staging.
 
 **Why a separate test schema?** Replit gives each app one development database. A schema keeps test data apart without needing permission to create databases, and the setup refuses to run if the schema isn't active.
 
