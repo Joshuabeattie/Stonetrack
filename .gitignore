@@ -11,3 +11,7 @@ coverage/
 .cache/
 .local/
 .upm/
+
+# Cloudflare (wrangler dev state and local secrets)
+.wrangler/
+.dev.vars*

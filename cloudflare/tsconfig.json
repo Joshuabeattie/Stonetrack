@@ -1,0 +1,9 @@
+{
+  // Type-checking for the Cloudflare Worker entry point. It also pulls in the server code
+  // it imports, so this checks that the server compiles against the Workers types too.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": ["./**/*.ts", "../server/types/**/*.d.ts"]
+}

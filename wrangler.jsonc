@@ -1,0 +1,49 @@
+// Cloudflare Workers configuration for the staging site (see "Staging on Cloudflare" in README.md).
+// Replit doesn't use this file; it runs the app with `npm start` as before.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "stonetrack",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-11-13",
+  // Node.js APIs (node:crypto, node:http…) that Express and pg need.
+  "compatibility_flags": ["nodejs_compat"],
+  "upload_source_maps": true,
+  "observability": { "enabled": true },
+
+  // The React build. Cloudflare serves these files directly; only /api/* runs the Worker.
+  // Any other unknown path (e.g. /jobs/12) gets index.html, so React Router can handle it.
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Hyperdrive: Cloudflare's connection pool in front of the Postgres database on Neon.
+  // localConnectionString is the database `wrangler dev` uses on your own machine.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/stonetrack"
+    }
+  ],
+
+  // Import .sql files as text, so cloudflare/migrations.ts can bundle the migrations.
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+
+  "vars": {
+    "NODE_ENV": "production",
+    "DEPLOY_TARGET": "cloudflare",
+    "DEMO_MODE": "true",
+    "FACTORY_TIMEZONE": "Australia/Melbourne",
+    "LOG_LEVEL": "info",
+    // Public on purpose. Staging is a public demo whose admin password is in the README,
+    // so this secret protects nothing extra, and it lets anyone send the example order
+    // (npm run webhook:example) to staging. For a real deployment, delete this line and
+    // store the secret with `npx wrangler secret put WEBHOOK_SECRET` instead.
+    "WEBHOOK_SECRET": "stonetrack-staging-public-demo-secret"
+  },
+
+  // Every night at 03:00 Melbourne summer time (16:00 UTC): put the demo data back.
+  "triggers": { "crons": ["0 16 * * *"] }
+}
